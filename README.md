@@ -1,5 +1,5 @@
 # EVO: Project Proposal
-Group Members: Yahya Rahhawi, James Cummings, Jiffy Lesica, Lukka Wolff
+#### **Group Members:** Yahya Rahhawi, James Cummings, Jiffy Lesica, Lukka Wolff
 
 ### Abstract
 
