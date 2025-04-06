@@ -6,6 +6,15 @@ Using principles of evolution to build a machine learning algorithm and explore 
 
 ### Motivation and Question
 
+We want to address implementation of niche machine learning algorithms and their applications. In our class lectures we often talk about finding the local minima of functions and how having convex functions aids us in finding this point. In models that rely on gradient descent we rely on being able to differentiate the loss function. **What happens when we don't have a convex or non-differentiable loss function?** *Evolutionary and genetic algorithms* present an alternative optimization framework that does not require gradient information.
+
+Our project will be three-fold. First, we will focus on handwriting recognition using the MNIST dataset. While this is a more traditional classification problem, it provides us the opportunity to test how evolutionary algorithms perform against standard gradient descent in a high-dimensional, image-based context.
+
+Our next focus is on building a symbolic regression system using evolutionary principles to evolve mathematical expressions that fit data. We will test this approach on the Feynman dataset, which consists of real physics equations and their corresponding input-output data. Since the equations are unknown to the model, the task is to rediscover them purely through data-driven search. 
+
+Finally, we will explore evolutionary feature selection using the Breast Cancer Wisconsin dataset. In this task, the evolutionary algorithm will be used to identify the most relevant subset of features for classification. Because feature selection is a discrete and combinatorial problem, it will hopefully serve as a strong example of where evolutionary methods can shine.
+
+
 ### Planned Deliverables
 
 - Implementation of Evolution based machine learning algorithm
