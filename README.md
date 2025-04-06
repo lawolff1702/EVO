@@ -59,7 +59,7 @@ By making machine learning more interpretable and inspired by natural processes,
 
 ### Addressing potential algorithmic bias
 
-If we end up using medical datasets — such as one for breast cancer classification — we’ll take extra care to examine how fair and representative our models are.
+If we end up using medical datasets, such as one for breast cancer classification, we’ll take extra care to examine how fair and representative our models are.
 
 We plan to look closely at the demographic distribution of the dataset and note any imbalances, whether they relate to race, gender, age, or other factors. These kinds of gaps can lead to biased models that don’t serve all groups equally. In addition to tracking overall accuracy, we’ll also report more meaningful performance metrics like false positive and false negative rates. This is especially important in medical applications, where a single misclassification could lead to real-world harm.
 
