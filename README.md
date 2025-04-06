@@ -6,7 +6,7 @@ Using principles of evolution to build a machine learning algorithm and explore 
 
 ### Motivation and Question
 
-We want to address implementation of niche machine learning algorithms and their applications. In our class lectures we often talk about finding the local minima of functions and how having convex functions aids us in finding this point. In models that rely on gradient descent we rely on being able to differentiate the loss function. **What happens when we don't have a convex or non-differentiable loss function?** *Evolutionary and genetic algorithms* present an alternative optimization framework that does not require gradient information.
+We want to address implementation of niche machine learning algorithms and their applications. In our class lectures we often talk about finding the local minima of functions and how having convex functions aids us in finding this point. In models that rely on gradient descent we rely on being able to differentiate the loss function. **What happens when we don't have a convex or differentiable loss function?** *Evolutionary and genetic algorithms* present an alternative optimization framework that does not require gradient information.
 
 Our project will be three-fold. First, we will focus on handwriting recognition using the MNIST dataset. While this is a more traditional classification problem, it provides us the opportunity to test how evolutionary algorithms perform against standard gradient descent in a high-dimensional, image-based context.
 
@@ -39,19 +39,18 @@ Group members will also enhance their proficiency in Python programming using ma
 
 ### Ethics Statement
 
-
 As part of our machine learning project exploring evolutionary optimization techniques,
 we recognize the importance of addressing ethical considerations that relate to the
 potential impacts of our work. Below are reflections based on the core questions on the assignment:
 
 
-### Who could benefit from our project?
+##### Who could benefit from our project?
 
 Our project brings together evolutionary algorithms and core machine learning tasks like classification, symbolic regression, and feature selection. By doing this, we hope to make machine learning not only more effective but also more interpretable and accessible.
 
 This work could benefit several groups. Machine learning researchers might find value in the way we explore optimization beyond traditional gradient-based methods. Educators and students could use our project as a hands-on, engaging example of how bio-inspired algorithms can be applied in real-world ML problems. And if we apply our techniques to datasets like the breast cancer classification dataset, there’s potential to support the medical and health research community by improving how we select features — possibly leading to more accurate and streamlined diagnostic tools.
 
-### Who could be excluded or harmed?
+##### Who could be excluded or harmed?
 
 While our project has a lot of potential, we also recognize that there are some important risks to keep in mind.
 
@@ -61,7 +60,7 @@ Another concern is that evolved models — especially ones generated through sym
 
 Finally, if we don’t make the project accessible through clear explanations or visualizations, people without a strong background in machine learning or computer science might find it difficult to engage with or benefit from our work.
 
-### Will the world be a better place because of our project?
+##### Will the world be a better place because of our project?
 
 Like any research project, We believe it will,  based on the following assumptions:
 
@@ -70,7 +69,7 @@ Evolutionary algorithms can enhance machine learning in areas where traditional 
 By making machine learning more interpretable and inspired by natural processes, we can help demystify the field and make it more accessible to a broader range of people — especially students and researchers coming from interdisciplinary or non-traditional backgrounds. In many real-world ML applications, it’s not just about how accurate a model is — it’s about understanding how and why it makes decisions. This level of transparency is crucial when we want to apply models in settings that demand accountability.
 
 
-### Addressing potential algorithmic bias
+##### Addressing potential algorithmic bias
 
 If we end up using medical datasets, such as one for breast cancer classification, we’ll take extra care to examine how fair and representative our models are.
 
