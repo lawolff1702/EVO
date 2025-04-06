@@ -51,5 +51,28 @@ We are aware of risks and limitations associated with our approach:
 - **Accessibility concerns**: Users without a CS or ML background may be excluded from
   benefiting if we do not provide explanations, visualizations, or clear documentation.
 
+### Will the world be a better place because of our project?
+
+Like any research project, We believe it will,  based on the following two assumptions:
+
+1. **Evolutionary algorithms can improve ML outcomes** where traditional methods struggle,
+    for example, optimizing non-differentiable objectives or discovering symbolic models with
+   interpretable structure.
+
+2. **Making ML more interpretable and nature-inspired** through evolutionary design can
+   broaden understanding and interest in ML, particularly for learners and researchers
+   from non-traditional or interdisciplinary backgrounds. In ML, we care more about how the model makes decisions rather than the correctness of these decisions to make sure
+   we can reliably deploy it in scenarios where accountability is required.
+
+
+### Addressing potential algorithmic bias
+
+If we use datasets for medical classification:
+
+- We will examine the **demographic distribution** of the dataset and document any
+  potential imbalance (e.g., race, gender, age).
+- We will report metrics beyond accuracy, including **false positives and false negatives**,
+  especially in medical contexts where misclassification can have serious consequences.
+
 
 ### Tentative Timeline
