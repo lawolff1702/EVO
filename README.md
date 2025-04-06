@@ -27,8 +27,8 @@ Group members will also enhance their proficiency in Python programming using ma
 ### Ethics Statement
 
 ### Tentative Timeline
-- Week 1:
-- Week 2:
-- Week 3:
-- Week 4:
-- Week 5:
+- Week 1: (Current) Project proposal.
+- Week 2: Baseline algorithm implementation.
+- Week 3: Begin Symbolic Regression and MNIST problems.
+- Week 4: Finish Begin Symbolic Regression and MNIST problems.
+- Week 5: Evolving Feature selection and alternative implementation exploration. Finalize project.
