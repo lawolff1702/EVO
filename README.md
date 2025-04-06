@@ -25,6 +25,10 @@ Finally, we will explore evolutionary feature selection using the Breast Cancer 
 
 ### Resources Required
 
+To complete our project, we will need access to several datasets, personal and cloud computing, and Python libraries for implementation and experimentation. For the application side of our data, we will use three publicly available datasets. We will use [Feynman Dataset](https://space.mit.edu/home/tegmark/aifeynman.html) for symbolic regression, which contains input-output data derived from real physics equations. For our handwriting recognition we will use the [MNIST Handwritten Digit Dataset](https://www.kaggle.com/datasets/oddrationale/mnist-in-csv). For feature selection and binary classification we will explore the [Breast Cancer Wisconsin Dataset](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_breast_cancer.html). All of these datasets are freely available! Our models may be computationally intensive, however, we expect that our laptops should be able to handle it. If computation proves too complex cloud-based Jupyter notebooks like Google Colab or Middlebury's ADA Cluster can also be used.
+
+We will be implementing our own evolutionary algorithm from scratch in Python using NumPy, pandas, and PyTorch. We will also use matplotlib or SeaBorn for data visualization and scikit-learn for model evaluation and comparison. These are all free!
+
 ### What You Will Learn
 
 In this project, group members will deepen their understanding of evolutionary machine learning algorithms, focusing on how evolutionary principles compare to or complement gradient descent methods in non-differentiable problem contexts. As such, part of this project will involve familiarization with the complexities and real-life examples of non-differentiable problems. We will gain hands-on experience implementing evolution-inspired ML techniques, including adjusting mutation rates and weights, and defining selection criteria tailored for given sub-problems (such as symbolic regression or MNIST handwriting recognition).
