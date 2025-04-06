@@ -22,3 +22,8 @@ Using principles of evolution to build a machine learning algorithm and explore 
 ### Ethics Statement
 
 ### Tentative Timeline
+- Week 1:
+- Week 2:
+- Week 3:
+- Week 4:
+- Week 5:
