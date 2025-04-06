@@ -11,6 +11,7 @@ Using principles of evolution to build a machine learning algorithm and explore 
 - Implementation of Evolution based machine learning algorithm
 - Application of algorithm to Symbolic Regression problem
 - Application of algorithm to MNIST handwriting recognition problem
+- Evolving feature selection on classification (Breast Cancer dataset)
 - Comparison of different implementations of evolution: evolution based feature selection, diversity preservation principles, island models, etc
 
 ### Resources Required
