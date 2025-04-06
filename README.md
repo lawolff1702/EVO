@@ -18,7 +18,7 @@
 
 As part of our machine learning project exploring evolutionary optimization techniques,
 we recognize the importance of addressing ethical considerations that relate to the
-potential impacts of our work. Below are reflections based on the core questions posed:
+potential impacts of our work. Below are reflections based on the core questions on the assignment:
 
 ---
 
@@ -28,7 +28,7 @@ Our project combines bio-inspired evolutionary algorithms with core ML tasks suc
 classification, symbolic regression, and feature selection. The following groups stand
 to benefit:
 
-- **Machine learning practitioners and researchers** seeking novel, interpretable
+- **Machine learning researchers** seeking novel, interpretable
   optimization techniques beyond gradient descent.
 - **Students and educators**, as our implementation can serve as an engaging and
   educational example of evolutionary computation applied to ML.
