@@ -8,6 +8,12 @@ Using principles of evolution to build a machine learning algorithm and explore 
 
 ### Planned Deliverables
 
+- Implementation of Evolution based machine learning algorithm
+- Application of algorithm to Symbolic Regression problem
+- Application of algorithm to MNIST handwriting recognition problem
+- Evolving feature selection on classification (Breast Cancer dataset)
+- Comparison of different implementations of evolution: evolution based feature selection, diversity preservation principles, island models, etc
+
 ### Resources Required
 
 ### What You Will Learn
@@ -17,3 +23,8 @@ Using principles of evolution to build a machine learning algorithm and explore 
 ### Ethics Statement
 
 ### Tentative Timeline
+- Week 1:
+- Week 2:
+- Week 3:
+- Week 4:
+- Week 5:
