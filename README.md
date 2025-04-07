@@ -37,6 +37,10 @@ Group members will also enhance their proficiency in Python programming using ma
 
 ### Risk Statement
 
+One risk is that the evolutionary algorithm we design may not perform well enough to produce meaningful results, especially when compared with traditional methods like gradient descent. We can mitigate this risk by clarifying that this research is an exploration, rather than a test of a specific hypothesis: we are not trying to prove that evolutionary algorithms perform better than gradient descent in non-differentiable problems, but instead exploring how they behave in these scenarios in comparison to gradient descent. For example, if our algorithm fails to output accurate predictions MNIST digit classification task - or "more accurate" results than gradient descent - we may struggle to show the benefits of using evolution-based approaches. This could happen if our method is too slow to improve, or fails to make progress over time.
+
+Another key risk is the amount of time and computing power required to run evolutionary experiments. Evolutionary algorithms often need to evaluate many different possible solutions over hundreds or thousands of generations (such as seen here: https://www.youtube.com/watch?v=N3tRFayqVtk), which can be very time-consuming. If we’re limited by the speed of our computers or the availability of computing resources, we may not be able to run enough experiments to tune the algorithm or explore all the variations we planned (like testing different mutation strategies or selection criteria). This could limit the depth and scope of our final results.
+
 ### Ethics Statement
 
 As part of our machine learning project exploring evolutionary optimization techniques,
