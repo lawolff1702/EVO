@@ -53,7 +53,21 @@ class LogisticRegression(LinearModel):
     """
     def __init__(self):
         super().__init__()
-        self.population = []
+        self.diversity_coeff = 0.0
+
+    def set_optimizer(self, optimizer):
+        """
+        Set the optimizer for the logistic regression model.
+        :param optimizer: An instance of an optimizer class.
+        """
+        self.optimizer = optimizer
+    
+    def set_diversity_coeff(self, diversity_coeff):
+        """
+        Set the diversity coefficient for the logistic regression model.
+        :param diversity_coeff: A float value representing the diversity coefficient.
+        """
+        self.diversity_coeff = diversity_coeff
 
     def sigmoid(self, x):
         """
@@ -73,7 +87,11 @@ class LogisticRegression(LinearModel):
         if w is None:
             w = self.w
         preds = torch.clamp(self.sigmoid(X @ w), 1e-7, 1 - 1e-7) # Avoid log(0)
-        return (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean()
+
+        #adding a term to penalize the model for low diversity in the population
+        diversity_term = torch.mean(torch.abs(w - self.w)) if self.w is not None else 0
+
+        return (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean() - (self.diversity_coeff * diversity_term)
     
     def grad(self, X, y):
         """
@@ -89,76 +107,109 @@ class LogisticRegression(LinearModel):
 
 
 
+import torch
+import random
+import heapq
+
 class EvolutionOptimizer():
     """
     Evolutionary algorithm optimizer for the logistic regression model.
-    This optimizer uses a population of individuals (weight vectors) and evolves them over generations.
+    This optimizer uses a population of individuals (weight vectors) and evolves
+    them over generations.
     """
-    def __init__(self, model):
+    def __init__(self, model, device=None):
         self.model = model
-        self.mutation_rate = 0.1  
+        self.population = []
+        self.mutation_rate = 0.1
+        self.diversity_coeff = 0.5
+        self.model.set_diversity_coeff(self.diversity_coeff)
         self.population_size = 100
         self.mutation_intensity = 0.1
+        # Device: default to MPS if not provided.
+        self.device = device if device is not None else torch.device("mps")
 
     def set_mutation_rate(self, mutation_rate):
-        """
-        Set the mutation rate for the evolutionary algorithm.
-        The mutation rate determines the probability of mutating each gene in the offspring.
-        A higher mutation rate increases the diversity of the population but may also disrupt good solutions.
-        """
         self.mutation_rate = mutation_rate
     
     def set_mutation_intensity(self, mutation_intensity):
-        """
-        Set the mutation intensity for the evolutionary algorithm.
-        The mutation intensity determines the standard deviation of the Gaussian noise added to the genes during mutation.
-        A higher mutation intensity increases the variability of the offspring.
-        """
         self.mutation_intensity = mutation_intensity
     
     def set_population_size(self, population_size):
-        """
-        Set the population size for the evolutionary algorithm.
-        The population size determines the number of individuals in the population.
-        """
         self.population_size = population_size
 
-    def step(self, X, y):
-        """
-        Perform one step of the evolutionary algorithm.
-        The algorithm works as follows:
-        1. If the population is empty, initialize it with random weights.
-        2. Sort the population based on their fitness (loss).
-        3. Select the best half of the population.
-        4. Create new individuals by combining genes from the best individuals.
-        5. Mutate the new individuals.
-        6. Update the population with the new individuals.
-        7. Set the model's weights to the best individual in the population.
-        """
-        if self.model.population == []:
-            self.model.population = [torch.rand(X.size(1)) for _ in range(self.population_size)]
+    def set_diversity_coeff(self, diversity_coeff):
+        self.diversity_coeff = diversity_coeff
+        self.model.set_diversity_coeff(self.diversity_coeff)
 
-        population = self.model.population
-        population = sorted(population, key=lambda w: self.model.loss(X, y, w))
-        population = population[:self.population_size // 2]  # Keep the best half
+    def step(self, X, y):
+        # Ensure X and y are on the target device.
+        X = X.to(self.device)
+        y = y.to(self.device)
+
+        if len(self.population) == 0:
+            # Initialize population with random weight vectors.
+            self.population = [torch.rand(X.size(1), device=self.device) 
+                            for _ in range(self.population_size)]
+
+        # Build tuples containing (loss, unique_id, candidate) so that ties can be broken.
+        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
+                        for i, w in enumerate(self.population)]
+        # Use heapq to extract the best half.
+        best_half = [w for (_, _, w) in heapq.nsmallest(self.population_size // 2, pop_with_losses)]
 
         new_population = []
-
+        # Generate new candidates using single-parent reproduction (with crossover)
         for _ in range(self.population_size): 
-            parent1 = random.choice(population)
-            parent2 = random.choice(population)
+            parent1 = random.choice(best_half)
+            parent2 = random.choice(best_half)
 
             # Inherit half from each parent
             mask = torch.rand_like(parent1) < 0.5
             child = torch.where(mask, parent1, parent2)
 
             mutation_mask = torch.rand_like(child) < self.mutation_rate
-            mutation_values = torch.normal(mean=0.0, std = self.mutation_intensity, size=child.size())
+            # Specify device for mutation_values so it's created on the same device.
+            mutation_values = torch.normal(mean=0.0, std=self.mutation_intensity,
+                                        size=child.size(), device=self.device)
             child = torch.where(mutation_mask, child + mutation_values, child)
 
             new_population.append(child)
 
-        # Update population and set model weights to best
-        self.model.population = new_population
-        best = min(new_population, key=lambda w: self.model.loss(X, y, w))
+        self.population = new_population
+        # Select the best individual from the new population using the same tie-breaker.
+        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
+                        for i, w in enumerate(new_population)]
+        best = min(pop_with_losses, key=lambda tup: (tup[0], tup[1]))[2]
         self.model.w = best
+
+
+    
+
+class GradientDescentOptimizer():
+    """
+    Gradient descent optimizer for the logistic regression model.
+    """
+    def __init__(self, model):
+        self.model = model
+        self.prev_w = None  
+
+    def step(self, X, y, alpha, beta):
+        """
+        Compute one step of the gradient descent update using the feature matrix X
+        and target vector y.
+        The update rule is:
+        w_new = w_old - alpha * grad + beta * (w_old - w_prev)
+        where alpha is the learning rate, beta is the momentum coefficient,
+        grad is the gradient of the loss function, and w_prev is the previous weight vector.
+        """
+        grad = self.model.grad(X, y)
+
+        if self.prev_w is None:
+            self.prev_w = self.model.w.clone()
+
+        momentum = beta * (self.model.w - self.prev_w)
+
+        new_w = self.model.w - alpha * grad + momentum
+
+        self.prev_w = self.model.w.clone()
+        self.model.w = new_w
