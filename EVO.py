@@ -112,6 +112,8 @@ class DeepNeuralNetwork:
         self.layer_dims = layer_dims
         self.diversity_coeff = 0.0
         self.optimizer = None
+        self.curr_bce = None
+        self.curr_diversity = None
         self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
         self.shapes = []
@@ -160,6 +162,8 @@ class DeepNeuralNetwork:
         preds = torch.clamp(self.forward(X, w), 1e-7, 1 - 1e-7)
         bce = (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean()
         diversity_term = self.optimizer.average_pairwise_distance() if self.optimizer else 0
+        self.curr_bce = bce.item()
+        self.curr_diversity = diversity_term.item() * self.diversity_coeff
         return bce - self.diversity_coeff * diversity_term
 
 
