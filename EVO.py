@@ -54,6 +54,7 @@ class LogisticRegression(LinearModel):
     def __init__(self):
         super().__init__()
         self.diversity_coeff = 0.0
+        self.optimizer = None
 
     def set_optimizer(self, optimizer):
         """
@@ -89,7 +90,7 @@ class LogisticRegression(LinearModel):
         preds = torch.clamp(self.sigmoid(X @ w), 1e-7, 1 - 1e-7) # Avoid log(0)
 
         #adding a term to penalize the model for low diversity in the population
-        diversity_term = torch.mean(torch.abs(w - self.w)) if self.w is not None else 0
+        diversity_term = self.optimizer.average_pairwise_distance()
 
         return (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean() - (self.diversity_coeff * diversity_term)
     
@@ -140,6 +141,30 @@ class EvolutionOptimizer():
     def set_diversity_coeff(self, diversity_coeff):
         self.diversity_coeff = diversity_coeff
         self.model.set_diversity_coeff(self.diversity_coeff)
+
+    def average_pairwise_distance(self):
+        n = len(self.population)
+        if n < 2:
+            return 0
+        dists = [torch.norm(self.population[i] - self.population[j])
+                for i in range(n) for j in range(i + 1, n)]
+        return torch.stack(dists).mean()
+    def average_cosine_dissimilarity(self):
+        n = len(self.population)
+        total = 0.0
+        count = 0
+        for i in range(n):
+            for j in range(i+1, n):
+                # Ensure non-zero norms
+                norm_i = torch.norm(self.population[i])
+                norm_j = torch.norm(self.population[j])
+                if norm_i > 0 and norm_j > 0:
+                    cos_sim = torch.dot(self.population[i], self.population[j]) / (norm_i * norm_j)
+                else:
+                    cos_sim = 0.0
+                total += (1 - cos_sim)
+                count += 1
+        return total / count if count > 0 else 0
 
     def step(self, X, y):
         # Ensure X and y are on the target device.
@@ -213,3 +238,17 @@ class GradientDescentOptimizer():
 
         self.prev_w = self.model.w.clone()
         self.model.w = new_w
+
+
+def average_pairwise_distance(population):
+    n = len(population)
+    total_dist = 0
+    count = 0
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            dist = torch.norm(population[i] - population[j])
+            total_dist += dist
+            count += 1
+
+    return total_dist / count if count > 0 else 0
