@@ -105,6 +105,62 @@ class LogisticRegression(LinearModel):
         sigmoid = self.sigmoid(self.score(X))
         grad = (sigmoid - y)[:, None] * X
         return grad.mean(0)
+    
+
+class DeepNeuralNetwork:
+    def __init__(self, layer_dims):
+        self.layer_dims = layer_dims
+        self.diversity_coeff = 0.0
+        self.optimizer = None
+        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+
+        self.shapes = []
+        total_params = 0
+        for i in range(len(layer_dims) - 1):
+            in_dim = layer_dims[i]
+            out_dim = layer_dims[i+1]
+            self.shapes.append((in_dim, out_dim))
+            total_params += in_dim * out_dim + out_dim
+
+        self.w = torch.rand(total_params, device=self.device)
+
+    def set_optimizer(self, optimizer):
+        self.optimizer = optimizer
+        
+
+    def set_diversity_coeff(self, diversity_coeff):
+        self.diversity_coeff = diversity_coeff
+
+    def forward(self, X, w=None):
+        if w is None:
+            w = self.w
+        offset = 0
+        out = X
+        for in_dim, out_dim in self.shapes[:-1]:
+            W = w[offset:offset + in_dim * out_dim].view(in_dim, out_dim)
+            offset += in_dim * out_dim
+            b = w[offset:offset + out_dim]
+            offset += out_dim
+            out = torch.relu(out @ W + b)
+
+        in_dim, out_dim = self.shapes[-1]
+        W = w[offset:offset + in_dim * out_dim].view(in_dim, out_dim)
+        offset += in_dim * out_dim
+        b = w[offset:offset + out_dim]
+        logits = out @ W + b
+        return torch.sigmoid(logits).squeeze()
+
+    def predict(self, X):
+        with torch.no_grad():
+            return (self.forward(X) > 0.5).float()
+
+    def loss(self, X, y, w=None):
+        if w is None:
+            w = self.w
+        preds = torch.clamp(self.forward(X, w), 1e-7, 1 - 1e-7)
+        bce = (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean()
+        diversity_term = self.optimizer.average_pairwise_distance() if self.optimizer else 0
+        return bce - self.diversity_coeff * diversity_term
 
 
 
