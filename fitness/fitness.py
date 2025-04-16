@@ -1,0 +1,50 @@
+from EVO import EvolutionOptimizer
+import torch
+import random
+import heapq
+
+class FitnessOptimizer(EvolutionOptimizer):
+    """
+    Fitness Optimizer class that inherits from EvolutionOptimizer.
+    """
+    def step(self, X, y, fitness_threshold=2):
+        # Ensure X and y are on the target device.
+        X = X.to(self.device)
+        y = y.to(self.device)
+
+        if len(self.population) == 0:
+            # Initialize population with random weight vectors.
+            self.population = [torch.rand(X.size(1), device=self.device) 
+                            for _ in range(self.population_size)]
+
+        # Build tuples containing (loss, unique_id, candidate) so that ties can be broken.
+        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
+                        for i, w in enumerate(self.population)]
+        
+        # Use heapq to extract the best population based on the fitness threshold.
+        best_half = [w for (_, _, w) in heapq.nsmallest(self.population_size // fitness_threshold, pop_with_losses)]
+
+        new_population = []
+        # Generate new candidates using single-parent reproduction (with crossover)
+        for _ in range(self.population_size): 
+            parent1 = random.choice(best_half)
+            parent2 = random.choice(best_half)
+
+            # Inherit half from each parent
+            mask = torch.rand_like(parent1) < 0.5
+            child = torch.where(mask, parent1, parent2)
+
+            mutation_mask = torch.rand_like(child) < self.mutation_rate
+            # Specify device for mutation_values so it's created on the same device.
+            mutation_values = torch.normal(mean=0.0, std=self.mutation_intensity,
+                                        size=child.size(), device=self.device)
+            child = torch.where(mutation_mask, child + mutation_values, child)
+
+            new_population.append(child)
+
+        self.population = new_population
+        # Select the best individual from the new population using the same tie-breaker.
+        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
+                        for i, w in enumerate(new_population)]
+        best = min(pop_with_losses, key=lambda tup: (tup[0], tup[1]))[2]
+        self.model.w = best
