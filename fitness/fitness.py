@@ -7,6 +7,25 @@ class FitnessOptimizer(EvolutionOptimizer):
     """
     Fitness Optimizer class that inherits from EvolutionOptimizer.
     """
+    def __init__(self, model, device=None):
+        super().__init__(model, device)
+        self.model = model
+        self.population = []
+        self.mutation_rate = 0.1
+        self.diversity_coeff = 0.5
+        self.model.set_diversity_coeff(self.diversity_coeff)
+        self.population_size = 100
+        self.mutation_intensity = 0.1
+        # Device: pick cuda (windows) → mps (mac) → cpu
+        if device is not None:
+            self.device = device
+        elif torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
+
     def step(self, X, y, fitness_threshold=2):
         # Ensure X and y are on the target device.
         X = X.to(self.device)
