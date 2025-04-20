@@ -16,15 +16,7 @@ class FitnessOptimizer(EvolutionOptimizer):
         self.model.set_diversity_coeff(self.diversity_coeff)
         self.population_size = 100
         self.mutation_intensity = 0.1
-        # Device: pick cuda (windows) → mps (mac) → cpu
-        if device is not None:
-            self.device = device
-        elif torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            self.device = torch.device("mps")
-        else:
-            self.device = torch.device("cpu")
+        self.device = torch.device(device)
 
     def step(self, X, y, fitness_threshold=2):
         # Ensure X and y are on the target device.
