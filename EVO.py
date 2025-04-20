@@ -87,12 +87,15 @@ class LogisticRegression(LinearModel):
         """
         if w is None:
             w = self.w
-        preds = torch.clamp(self.sigmoid(X @ w), 1e-7, 1 - 1e-7) # Avoid log(0)
+        w = w.to(X.device)  # ✅ Ensure same device
 
-        #adding a term to penalize the model for low diversity in the population
+        preds = torch.clamp(self.sigmoid(X @ w), 1e-7, 1 - 1e-7)  # Avoid log(0)
+
+        # Adding a term to penalize the model for low diversity in the population
         diversity_term = self.optimizer.average_pairwise_distance()
 
         return (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean() - (self.diversity_coeff * diversity_term)
+
     
     def grad(self, X, y):
         """
