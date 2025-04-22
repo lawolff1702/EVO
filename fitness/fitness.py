@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../ExplorationVsExploitation')
 from EVO import EvolutionOptimizer
 import torch
 import random
@@ -7,8 +9,8 @@ class FitnessOptimizer(EvolutionOptimizer):
     """
     Fitness Optimizer class that inherits from EvolutionOptimizer.
     """
-    def __init__(self, model, device=None):
-        super().__init__(model, device)
+    def __init__(self, model):
+        super().__init__(model)
         self.model = model
         self.population = []
         self.mutation_rate = 0.1
@@ -16,7 +18,7 @@ class FitnessOptimizer(EvolutionOptimizer):
         self.model.set_diversity_coeff(self.diversity_coeff)
         self.population_size = 100
         self.mutation_intensity = 0.1
-        self.device = torch.device(device)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
     def step(self, X, y, fitness_threshold=2):
         # Ensure X and y are on the target device.
