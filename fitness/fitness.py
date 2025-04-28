@@ -21,12 +21,20 @@ class FitnessOptimizer(EvolutionOptimizer):
         self.device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
         self.fitness_ratio = 0.5
         self.survivors_ratio = 0.1
+        self.sneakers_ratio = 0.2
+        self.sneaker_prob = 0.05
 
     def set_fitness_ratio(self, fitness_ratio):
         self.fitness_ratio = fitness_ratio
 
     def set_survivors_ratio(self, survivors_ratio):
         self.survivors_ratio = survivors_ratio
+
+    def set_sneakers_ratio(self, sneakers_ratio):
+        self.sneakers_ratio = sneakers_ratio
+
+    def set_sneaker_prob(self, sneaker_prob):
+        self.sneaker_prob = sneaker_prob
 
     def step(self, X, y):
         # Ensure X and y are on the target device.
@@ -44,7 +52,14 @@ class FitnessOptimizer(EvolutionOptimizer):
         
         # Use heapq to extract the best population based on the fitness threshold.
         best_half = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.fitness_ratio), pop_with_losses)]
+
+        # Low-ranking candidates are added to the best_half with low probability.
+        if random.random() < self.sneaker_prob:
+            sneakers = [w for (_, _, w) in heapq.nlargest(int(self.population_size * self.sneakers_ratio), pop_with_losses)]
+            best_half.extend(sneakers)
+        
         survivors = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.survivors_ratio), pop_with_losses)]
+
 
         new_population = []
         # Generate new candidates using single-parent reproduction (with crossover)
