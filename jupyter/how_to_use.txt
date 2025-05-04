@@ -1,0 +1,3 @@
+go to EVO/jupyter
+run ./jupyterLabOnNode.sh <env_name> -p gpu-standard 
+run  ssh -L8888:node002:8888 <username>@ada.middlebury.edu locally
