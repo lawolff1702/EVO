@@ -1,0 +1,17 @@
+name: evo-project
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - python=3.12
+  - jupyter
+  - matplotlib
+  - pytorch
+  - scikit-learn
+  - torchaudio
+  - torchvision
+  - numpy=1.26
+prefix: /opt/anaconda3/envs/evo-project
