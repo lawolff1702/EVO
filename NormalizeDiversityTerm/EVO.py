@@ -90,7 +90,7 @@ class LogisticRegression(LinearModel):
             w = self.w
         preds = torch.clamp(self.sigmoid(X @ w), 1e-7, 1 - 1e-7) # Avoid log(0)
 
-        #adding a term to penalize the model for low diversity in the population
+        # adding a term to penalize the model for low diversity in the population
         # Add diversity penalty *only* if self.optimizer is set
         if hasattr(self.optimizer, "compute_diversity"):
             diversity_term = self.optimizer.compute_diversity()
@@ -141,6 +141,7 @@ class DeepNeuralNetwork:
             w = self.w
         offset = 0
         out = X
+        out = X.to(self.device)
         for in_dim, out_dim in self.shapes[:-1]:
             W = w[offset:offset + in_dim * out_dim].view(in_dim, out_dim)
             offset += in_dim * out_dim
@@ -244,41 +245,110 @@ class EvolutionOptimizer():
     def compute_diversity(self, metric=None):
         if metric is None:
             metric = self.diversity_metric
-        
         if metric == "euclidean":
             return self.average_pairwise_distance()
         elif metric == "cosine":
             return self.average_cosine_dissimilarity()
         elif metric == "std":
-            all_w = torch.stack(self.population)
-            return all_w.std(dim=0).mean()
+            return self.diversity_standard_deviation()
+        elif metric == "variance":
+            return self.average_variance()
         else:
             raise ValueError(f"Unknown diversity metric: {metric}")
 
     def average_pairwise_distance(self):
         n = len(self.population)
         if n < 2:
-            return 0
-        dists = [torch.norm(self.population[i] - self.population[j])
-                for i in range(n) for j in range(i + 1, n)]
-        return torch.stack(dists).mean()
+            return torch.tensor(0.0, device=self.device)
+        
+        # Stack all vectors into matrix
+        all_w = torch.stack(self.population)
+
+        # Compute squared norm/magnitude for each vector (||u||^2)
+        # Produces a column vector
+        # all_w is matrix where each row is weight vector
+        # all_w ** 2 squares each element in matrix (i.e. each weight)
+        # .sum(dim=1) will sum every squared weight in each vector, giving us a 1d vector with all magnitudes squared
+        # keepdim=True keeps result a column vector
+        magnitude_squared = (all_w ** 2).sum(dim=1, keepdim=True)
+
+        # Euclidean distance squared pairs identity
+        # used to calculate the squared euclidean distance between all vector pairs 
+        # Distance Squared between 2 vectors u and v: ||u - v||^2
+        # Simplifies to ||u||^2 + ||v||^2 - 2<u,v>
+        distance_squared = magnitude_squared + magnitude_squared.T - (2 * (all_w @ all_w.T))
+
+        # Create a boolean mask fo upper triangle of matrix (values above diagonal are true)
+        # https://pytorch.org/docs/stable/generated/torch.triu.html
+        # Use this to avoid computing same pair twice
+        # diagonal = 1 so diagonal is excluded in output
+        triangle_mask = torch.triu(torch.ones(n, n, device=self.device), diagonal=1).bool()
+
+        # Extract distances using triangle mask
+        # Clamp to make sure no Os get in
+        pair_distances = torch.sqrt(torch.clamp(distance_squared[triangle_mask], min=0.0))
+
+        return pair_distances.mean()
+
+
     
     def average_cosine_dissimilarity(self):
+        # Changed to vectorized
         n = len(self.population)
-        total = 0.0
-        count = 0
-        for i in range(n):
-            for j in range(i+1, n):
-                # Ensure non-zero norms
-                norm_i = torch.norm(self.population[i])
-                norm_j = torch.norm(self.population[j])
-                if norm_i > 0 and norm_j > 0:
-                    cos_sim = torch.dot(self.population[i], self.population[j]) / (norm_i * norm_j)
-                else:
-                    cos_sim = 0.0
-                total += (1 - cos_sim)
-                count += 1
-        return total / count if count > 0 else 0
+
+        # Can't perform comparison on less than 2 vectors
+        if n < 2:
+            return torch.tensor(0.0, device=self.device)
+        
+        # Takes all individual weight vectors in population, and stacks them into single, 2D tensor
+        # Gives us matrix of all weight vectors for matrix multiplication
+        all_w = torch.stack(self.population)
+
+        # Calculate magnitude of all vectors (needed for cosine similarity)
+        # dim = 1 sums along features (along the row)
+        # keepdim = True keeps output as 2d column vector (i.e. (n,1) rather than (n,))
+        mags = torch.norm(all_w, dim=1, keepdim=True)
+
+        # Add small small small value to avoid division by 0
+        mags += 1e-8
+
+        # Divide each weight vector by magnitude to get unit vectors
+        # We want unit vectors because we don't want vector length to interfere with calculation
+        # Cosine similarity is about angle between vectors, not length
+        normalized = all_w / mags
+
+        # Calculate cosine matrix
+        # Mulitplying by transpose gives an matrix where each entry = cosine similarity between two vectors
+        # Remember: The dot product between two vectors - what is happening in matrix multiplication - is the cos similarity of those vectors!
+        # NOTE: This matrix is symmetric --> only need half (consider in next step)
+        # We know this beacause the dot product is symmetric/commutative, and bottom half entries are the same as top half of matrix
+        cos_matrix = normalized @ normalized.T
+
+        # Create a boolean mask fo upper triangle of matrix (values above diagonal are true)
+        # https://pytorch.org/docs/stable/generated/torch.triu.html
+        # Use this to avoid computing same pair twice
+        triangle_mask = torch.triu(torch.ones(n, n, device=self.device), diagonal=1).bool()
+        cos_similarities = cos_matrix[triangle_mask]
+
+        # Cosine dissimilarity = 1 - cos similarity
+        cos_dissimilarities = 1 - cos_similarities
+
+        # Return average dissimilarity across all pairs
+        return cos_dissimilarities.mean()
+
+
+    def average_variance(self):
+        if len(self.population) < 2:
+            return torch.tensor(0.0, device=self.device)
+        
+        all_w = torch.stack(self.population)
+        variance_per_dim = all_w.var(dim=0)
+        return variance_per_dim.mean()
+    
+    def diversity_standard_deviation(self):
+        all_w = torch.stack(self.population)
+        return all_w.std(dim=0).mean()
+
 
     def step(self, X, y):
         # Ensure X and y are on the target device.
@@ -365,31 +435,3 @@ class GradientDescentOptimizer():
 
         self.prev_w = self.model.w.clone()
         self.model.w = new_w
-    
-def seed_dnn_from_logistic(dnn_model, logistic_model):
-    """
-    Seeds first layer of DNN with weights from short logistic regression training loop
-    Uses logistic weights, modified with noise, and sets them in DNN's first layer
-    to hopefully transfer high accuracy/low loss to start of DNN training loop
-    """
-    input_dim = dnn_model.layer_dims[0]
-    h1_dim = dnn_model.layer_dims[1]
-
-    # Essentially creating a copy of weight tensor which can't be modified by other processes
-    logistic_weights = logistic_model.w.detach().clone()
-    w_log = logistic_weights.unsqueeze(1).repeat(1, h1_dim)
-
-    # Add random noise to each element of W
-    w_log += 0.01 * torch.randn(input_dim, h1_dim, device=logistic_weights.device)
-
-    # Set offset index to 0 to start filling neurons
-    offset = 0
-
-    # Fill all weight values with corresponding values from logistic training
-    dnn_model.w.data[offset : offset + input_dim * h1_dim] = w_log.flatten()
-
-    # Increment offset to now fill bias values (remember, working on flattened tensor)
-    offset += input_dim * h1_dim
-
-    # Fill bias values with 0 as baseline
-    dnn_model.w.data[offset : offset + h1_dim] = 0
