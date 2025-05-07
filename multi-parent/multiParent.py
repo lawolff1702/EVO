@@ -24,8 +24,8 @@ class mpEvolutionOptimizer(EvolutionOptimizer):
 
         new_population = []
 
+         
         for _ in range(self.population_size): 
-
             # randomly select (without replacement) parents from surviving population
             parents = random.sample(population, num_parents)
             child = torch.empty_like(parents[0])
