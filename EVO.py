@@ -118,7 +118,8 @@ class DeepNeuralNetwork:
         self.optimizer = None
         self.curr_bce = None
         self.curr_diversity = None
-        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+        self.use_diversity_loss = False
+        self.device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
         self.shapes = []
         total_params = 0
@@ -172,7 +173,9 @@ class DeepNeuralNetwork:
         # Cross entropy --> no longer binary
         loss_function = nn.CrossEntropyLoss()
         loss = loss_function(logits, y)
-
+        if not self.use_diversity_loss:
+            return loss
+        
         diversity_term = self.optimizer.compute_diversity() if self.optimizer else 0
 
         self.curr_loss = loss.item()
@@ -222,8 +225,27 @@ class EvolutionOptimizer():
         self.population_size = 100
         self.mutation_intensity = 0.1
         self.diversity_metric = "euclidean"
-        # Device: default to MPS if not provided.
-        self.device = device if device is not None else torch.device("mps")
+        self.device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+        self.fitness_ratio = 0.5
+        self.survivors_ratio = 0.1
+        self.sneakers_ratio = 0.1
+        self.sneaker_prob = 0.05
+        self.mutation_type = "lap"
+
+    def set_mutation_type(self, mutation_type):
+        self.mutation_type = mutation_type
+
+    def set_fitness_ratio(self, fitness_ratio):
+        self.fitness_ratio = fitness_ratio
+
+    def set_survivors_ratio(self, survivors_ratio):
+        self.survivors_ratio = survivors_ratio
+
+    def set_sneakers_ratio(self, sneakers_ratio):
+        self.sneakers_ratio = sneakers_ratio
+
+    def set_sneaker_prob(self, sneaker_prob):
+        self.sneaker_prob = sneaker_prob
 
     def set_mutation_rate(self, mutation_rate):
         self.mutation_rate = mutation_rate
@@ -350,7 +372,19 @@ class EvolutionOptimizer():
     def diversity_standard_deviation(self):
         all_w = torch.stack(self.population)
         return all_w.std(dim=0).mean()
+    
+    def ce_loss(self, X, y, w=None):
+        if w is None:
+            w = self.w
+        
+        logits = self.model.forward(X, w)
 
+        loss_function = nn.CrossEntropyLoss()
+        loss = loss_function(logits, y)
+
+        self.curr_loss = loss.item()
+
+        return loss
 
     def step(self, X, y, num_parents=2):
         # Ensure X and y are on the target device.
@@ -364,14 +398,23 @@ class EvolutionOptimizer():
             
 
         # Build tuples containing (loss, unique_id, candidate) so that ties can be broken.
-        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
-                        for i, w in enumerate(self.population)]
+        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) for i, w in enumerate(self.population)]
         
-        # Use heapq to extract the best half.
-        best_half = [w for (_, _, w) in heapq.nsmallest(self.population_size // 2, pop_with_losses)]
+        pop_with_CE = [(self.ce_loss(X, y, w), i, w) for i, w in enumerate(self.population)]
+        
+        # Use heapq to extract the best population based on the fitness threshold.
+        best_half = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.fitness_ratio), pop_with_losses)]
+
+        # Low-ranking candidates are added to the best_half with low probability.
+        if random.random() < self.sneaker_prob:
+            sneakers = [w for (_, _, w) in heapq.nlargest(int(self.population_size * self.sneakers_ratio), pop_with_losses)]
+            best_half.extend(sneakers)
+        
+        survivors = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.survivors_ratio), pop_with_CE)]
+
 
         new_population = []
-        for _ in range(self.population_size): 
+        for _ in range(self.population_size - len(survivors)): 
             if num_parents == 0:
                 # Pure random individual
                 child = torch.rand(self.model.w.size(0), device=self.device).detach()
@@ -387,12 +430,25 @@ class EvolutionOptimizer():
 
                 # Mutation
                 mutation_mask = torch.rand_like(child) < self.mutation_rate
-                mutation_values = torch.normal(mean=0.0, std=self.mutation_intensity, size=child.size(), device=self.device)
+
+                if self.mutation_type == "lap":
+                    mutation_values = torch.distributions.Laplace(
+                        loc=0.0, scale=self.mutation_intensity
+                    ).sample(child.size()).to(self.device)
+                else:
+                    mutation_values = torch.normal(
+                        mean=0.0,
+                        std=self.mutation_intensity,
+                        size=child.size(),
+                        device=self.device
+                    )
+                
                 child = torch.where(mutation_mask, child + mutation_values, child)
 
             new_population.append(child)
 
-
+        # Add survivors to the new population.
+        new_population.extend(survivors)
 
         for i in range(len(new_population)):
             #Load child weights into the model
