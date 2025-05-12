@@ -162,7 +162,7 @@ class DeepNeuralNetwork:
             # Pick class with highest logit (probability!)
             return torch.argmax(logits, dim = 1)
 
-    def loss(self, X, y, w=None):
+    def loss(self, X, y, w=None, include_diversity=False):
         if w is None:
             w = self.w
         
@@ -170,13 +170,14 @@ class DeepNeuralNetwork:
         # Cross entropy --> no longer binary
         loss_function = nn.CrossEntropyLoss()
         loss = loss_function(logits, y)
-
         diversity_term = self.optimizer.compute_diversity() if self.optimizer else 0
-
         self.curr_loss = loss.item()
         self.curr_diversity = diversity_term.item() * self.diversity_coeff
 
-        return loss - (self.diversity_coeff * diversity_term)
+        if include_diversity:
+            return loss - (self.diversity_coeff * diversity_term)
+        else:
+            return loss
     
     def backprop_step(self, X, y, lr):
         X = X.to(self.device)     # move inputs to GPU/MPS if your w lives there

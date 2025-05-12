@@ -137,6 +137,18 @@ class DeepNeuralNetwork:
     def set_diversity_coeff(self, diversity_coeff):
         self.diversity_coeff = diversity_coeff
 
+    def enable_diversity_loss(self):
+        if self.use_diversity_loss:
+            print("Diversity loss already enabled")
+        else:
+            self.use_diversity_loss = True
+
+    def disable_diversity_loss(self):
+        if not self.use_diversity_loss:
+            print("Diversity loss already disabled")
+        else:
+            self.use_diversity_loss = False
+
     def forward(self, X, w=None):
         if w is None:
             w = self.w
@@ -173,15 +185,15 @@ class DeepNeuralNetwork:
         # Cross entropy --> no longer binary
         loss_function = nn.CrossEntropyLoss()
         loss = loss_function(logits, y)
-        if not self.use_diversity_loss:
-            return loss
-        
         diversity_term = self.optimizer.compute_diversity() if self.optimizer else 0
 
         self.curr_loss = loss.item()
         self.curr_diversity = diversity_term.item() * self.diversity_coeff
 
-        return loss - (self.diversity_coeff * diversity_term)
+        if not self.use_diversity_loss:
+            return loss
+        else:
+            return loss - (self.diversity_coeff * diversity_term)
     
     def backprop_step(self, X, y, lr):
         X = X.to(self.device)     # move inputs to GPU/MPS if your w lives there
