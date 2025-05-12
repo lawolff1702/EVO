@@ -391,8 +391,12 @@ class EvolutionOptimizer():
             
 
         # Build tuples containing (loss, unique_id, candidate) so that ties can be broken.
-        with torch.no_grad():
-            pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) for i, w in enumerate(self.population)]
+        pop_with_losses = []
+        for i, w in enumerate(self.population):
+            loss = self.model.loss(X, y, w)
+            with torch.no_grad():
+                pop_with_losses.append((loss.item(), i, w))
+
         
         # Use heapq to extract the best population based on the fitness threshold.
         best_half = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.fitness_ratio), pop_with_losses)]
@@ -451,7 +455,7 @@ class EvolutionOptimizer():
                 # After update, store the new weights (detached)
                 new_population[i] = self.model.w.detach()
             else:
-                # If not using backprop, just store as is
+                # If not using backprop, just store as-is
                 new_population[i] = self.model.w
 
         self.population = new_population
