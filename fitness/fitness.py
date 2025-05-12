@@ -4,6 +4,7 @@ from EVO import EvolutionOptimizer
 import torch
 import random
 import heapq
+from torch import nn
 
 class FitnessOptimizer(EvolutionOptimizer):
     """
@@ -36,6 +37,19 @@ class FitnessOptimizer(EvolutionOptimizer):
 
     def set_sneaker_prob(self, sneaker_prob):
         self.sneaker_prob = sneaker_prob
+    
+    def ce_loss(self, X, y, w=None):
+        if w is None:
+            w = self.w
+        
+        logits = self.model.forward(X, w)
+
+        loss_function = nn.CrossEntropyLoss()
+        loss = loss_function(logits, y)
+
+        self.curr_loss = loss.item()
+
+        return loss
 
     def step(self, X, y):
         # Ensure X and y are on the target device.
@@ -51,6 +65,9 @@ class FitnessOptimizer(EvolutionOptimizer):
         pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
                         for i, w in enumerate(self.population)]
         
+        pop_with_CE = [(self.ce_loss(X, y, w), i, w)
+                        for i, w in enumerate(self.population)]
+        
         # Use heapq to extract the best population based on the fitness threshold.
         best_half = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.fitness_ratio), pop_with_losses)]
 
@@ -59,7 +76,7 @@ class FitnessOptimizer(EvolutionOptimizer):
             sneakers = [w for (_, _, w) in heapq.nlargest(int(self.population_size * self.sneakers_ratio), pop_with_losses)]
             best_half.extend(sneakers)
         
-        survivors = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.survivors_ratio), pop_with_losses)]
+        survivors = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.survivors_ratio), pop_with_CE)]
 
 
         new_population = []
