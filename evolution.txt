@@ -1,0 +1,60 @@
+Generation 1, Test Accuracy: 12.37%
+Generation 2, Test Accuracy: 14.40%
+Generation 3, Test Accuracy: 19.12%
+Generation 4, Test Accuracy: 18.35%
+Generation 5, Test Accuracy: 19.12%
+Checkpoint saved at checkpoint_gen_5.pt
+Generation 6, Test Accuracy: 19.12%
+Generation 7, Test Accuracy: 19.12%
+Generation 8, Test Accuracy: 19.50%
+Generation 9, Test Accuracy: 19.50%
+Generation 10, Test Accuracy: 21.58%
+Checkpoint saved at checkpoint_gen_10.pt
+Generation 11, Test Accuracy: 27.44%
+Generation 12, Test Accuracy: 43.96%
+Generation 13, Test Accuracy: 27.94%
+Generation 14, Test Accuracy: 17.92%
+Generation 15, Test Accuracy: 17.71%
+Checkpoint saved at checkpoint_gen_15.pt
+Generation 16, Test Accuracy: 18.40%
+Generation 17, Test Accuracy: 14.26%
+Generation 18, Test Accuracy: 12.75%
+Generation 19, Test Accuracy: 12.30%
+Generation 20, Test Accuracy: 12.88%
+Checkpoint saved at checkpoint_gen_20.pt
+Generation 21, Test Accuracy: 13.76%
+Generation 22, Test Accuracy: 13.74%
+Generation 23, Test Accuracy: 13.06%
+Generation 24, Test Accuracy: 13.08%
+Generation 25, Test Accuracy: 13.00%
+Checkpoint saved at checkpoint_gen_25.pt
+Generation 26, Test Accuracy: 9.70%
+Generation 27, Test Accuracy: 11.14%
+Generation 28, Test Accuracy: 12.66%
+Generation 29, Test Accuracy: 10.63%
+Generation 30, Test Accuracy: 12.44%
+Checkpoint saved at checkpoint_gen_30.pt
+Generation 31, Test Accuracy: 10.91%
+Generation 32, Test Accuracy: 10.46%
+Generation 33, Test Accuracy: 9.47%
+Generation 34, Test Accuracy: 10.30%
+Generation 35, Test Accuracy: 10.59%
+Checkpoint saved at checkpoint_gen_35.pt
+Generation 36, Test Accuracy: 10.67%
+Generation 37, Test Accuracy: 11.74%
+Generation 38, Test Accuracy: 11.70%
+Generation 39, Test Accuracy: 11.62%
+Generation 40, Test Accuracy: 10.33%
+Checkpoint saved at checkpoint_gen_40.pt
+Generation 41, Test Accuracy: 10.63%
+Generation 42, Test Accuracy: 10.01%
+Generation 43, Test Accuracy: 10.58%
+Generation 44, Test Accuracy: 9.17%
+Generation 45, Test Accuracy: 11.70%
+Checkpoint saved at checkpoint_gen_45.pt
+Generation 46, Test Accuracy: 10.55%
+Generation 47, Test Accuracy: 10.94%
+Generation 48, Test Accuracy: 10.97%
+Generation 49, Test Accuracy: 10.16%
+Generation 50, Test Accuracy: 10.28%
+Checkpoint saved at checkpoint_gen_50.pt
