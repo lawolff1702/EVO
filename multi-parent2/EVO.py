@@ -77,26 +77,34 @@ class LogisticRegression(LinearModel):
         """
         return 1 / (1 + torch.exp(-x))
 
-    def loss(self, X, y, w=None):
+    def loss(self, X, y, w=None, *, include_diversity: bool = True):
         """
-        Compute the binary cross-entropy loss for the logistic regression model.
-        The loss is defined as:
-        L(w) = -1/n * sum(y_i * log(sigmoid(X_i @ w)) + (1 - y_i) * log(1 - sigmoid(X_i @ w)))
-        where n is the number of samples, X_i is the i-th sample, and y_i is the corresponding label.
-        The loss is averaged over all samples.
-        If w is not provided, the model's current weights are used.
+        Binary-cross-entropy with an optional diversity penalty.
+
+        › The penalty is applied **only if**  
+        · self.use_diversity_loss  is True  (model-level switch)            and  
+        · include_diversity        is True  (call-site override)            and  
+        · self.optimizer has compute_diversity().
         """
         if w is None:
             w = self.w
-        preds = torch.clamp(self.sigmoid(X @ w), 1e-7, 1 - 1e-7) # Avoid log(0)
 
-        # adding a term to penalize the model for low diversity in the population
-        # Add diversity penalty *only* if self.optimizer is set
-        if hasattr(self.optimizer, "compute_diversity"):
-            diversity_term = self.optimizer.compute_diversity()
-            return (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean() - (self.diversity_coeff * diversity_term)
+        # --- CE term ------------------------------------------------------
+        preds = torch.clamp(self.sigmoid(X @ w), 1e-7, 1 - 1e-7)
+        ce = (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean()
+
+        # --- Diversity term (optional) ------------------------------------
+        diversity_active = (
+            include_diversity
+            and getattr(self, "use_diversity_loss", True)      # default to True if attr absent
+            and hasattr(self.optimizer, "compute_diversity")
+        )
+
+        if diversity_active:
+            div = self.optimizer.compute_diversity()
+            return ce - self.diversity_coeff * div
         else:
-            return (-y * torch.log(preds) - (1 - y) * torch.log(1 - preds)).mean()
+            return ce
     
     def grad(self, X, y):
         """
@@ -118,7 +126,8 @@ class DeepNeuralNetwork:
         self.optimizer = None
         self.curr_bce = None
         self.curr_diversity = None
-        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+        self.use_diversity_loss = False
+        self.device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
         self.shapes = []
         total_params = 0
@@ -162,23 +171,31 @@ class DeepNeuralNetwork:
             # Pick class with highest logit (probability!)
             return torch.argmax(logits, dim = 1)
 
-    def loss(self, X, y, w=None):
+    def loss(self, X, y, w=None, *, include_diversity: bool = True):
+        """
+        Multi-class cross-entropy with optional diversity penalty.
+        Respects both self.use_diversity_loss and include_diversity.
+        """
         if w is None:
             w = self.w
-        X = X.to(self.device)
-        y = y.to(self.device)
-        
+        X, y = X.to(self.device), y.to(self.device)
+
+        # --- CE term ------------------------------------------------------
         logits = self.forward(X, w)
-        # Cross entropy --> no longer binary
-        loss_function = nn.CrossEntropyLoss()
-        loss = loss_function(logits, y)
+        ce = nn.CrossEntropyLoss()(logits, y)
 
-        diversity_term = self.optimizer.compute_diversity() if self.optimizer else 0
+        # --- Diversity term (optional) ------------------------------------
+        diversity_active = (
+            include_diversity
+            and self.use_diversity_loss                       # already defined in class
+            and self.optimizer is not None
+        )
 
-        self.curr_loss = loss.item()
-        self.curr_diversity = diversity_term.item() * self.diversity_coeff
-
-        return loss - (self.diversity_coeff * diversity_term)
+        if diversity_active:
+            div = self.optimizer.compute_diversity()
+            return ce - self.diversity_coeff * div
+        else:
+            return ce
     
     def backprop_step(self, X, y, lr):
         X = X.to(self.device)     # move inputs to GPU/MPS if your w lives there
@@ -222,8 +239,40 @@ class EvolutionOptimizer():
         self.population_size = 100
         self.mutation_intensity = 0.1
         self.diversity_metric = "euclidean"
-        # Device: default to MPS if not provided.
-        self.device = device if device is not None else torch.device("mps")
+        self.device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+        self.fitness_ratio = 0.5
+        self.survivors_ratio = 0.1
+        self.sneakers_ratio = 0.1
+        self.sneaker_prob = 0.05
+        self.mutation_type = "lap"
+        # Temporary
+        self.use_backprop = False
+        self.model.set_optimizer(self)
+        self.num_parents = 2
+
+    def set_num_parents(self, num_parents):
+        """
+        Set the number of parents to be used for crossover.
+        """
+        self.num_parents = num_parents
+        
+    def set_use_backprop(self, use_backprop):
+        self.use_backprop = use_backprop
+
+    def set_mutation_type(self, mutation_type):
+        self.mutation_type = mutation_type
+
+    def set_fitness_ratio(self, fitness_ratio):
+        self.fitness_ratio = fitness_ratio
+
+    def set_survivors_ratio(self, survivors_ratio):
+        self.survivors_ratio = survivors_ratio
+
+    def set_sneakers_ratio(self, sneakers_ratio):
+        self.sneakers_ratio = sneakers_ratio
+
+    def set_sneaker_prob(self, sneaker_prob):
+        self.sneaker_prob = sneaker_prob
 
     def set_mutation_rate(self, mutation_rate):
         self.mutation_rate = mutation_rate
@@ -352,66 +401,132 @@ class EvolutionOptimizer():
         return all_w.std(dim=0).mean()
 
 
-    def step(self, X, y, num_parents=2):
-        # Ensure X and y are on the target device.
-        X = X.to(self.device)
-        y = y.to(self.device)
+    def step(self, X, y):
+        """
+        One evolutionary generation.
+        • Parents (best_half) are chosen by the diversity-regularised loss
+          → model.loss(..., include_diversity=True)           exploration
+        • Survivors (elitism) are chosen by plain CE only
+          → model.loss(..., include_diversity=False)          exploitation
+        """
+        # -------------------------------------------------------------
+        # 0. Move data to the right device and build an initial population
+        # -------------------------------------------------------------
+        X, y = X.to(self.device), y.to(self.device)
 
         if len(self.population) == 0:
-            # Initialize population with random weight vectors.
-            self.population = [torch.rand(self.model.w.size(0), device=self.device).detach().requires_grad_(True) 
-                            for _ in range(self.population_size)] 
-            
+            # Need parameter dimension; ensure model.w exists
+            if self.model.w is None:
+                _ = self.model.score(X)          # initialises self.model.w
+            self.population = [
+                torch.rand_like(self.model.w, device=self.device)
+                for _ in range(self.population_size)
+            ]
 
-        # Build tuples containing (loss, unique_id, candidate) so that ties can be broken.
-        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
-                        for i, w in enumerate(self.population)]
-        
-        # Use heapq to extract the best half.
-        best_half = [w for (_, _, w) in heapq.nsmallest(self.population_size // 2, pop_with_losses)]
+        # -------------------------------------------------------------
+        # 1. Evaluate population – two different loss flavours
+        # -------------------------------------------------------------
+        with torch.no_grad():
+            # (a) Diversity-aware loss → for parent selection
+            pop_with_losses = [
+                (self.model.loss(X, y, w, include_diversity=True).item(), i, w)
+                for i, w in enumerate(self.population)
+            ]
 
+            # (b) CE-only loss → for elitist survivors
+            pop_ce_only = [
+                (self.model.loss(X, y, w, include_diversity=False).item(), i, w)
+                for i, w in enumerate(self.population)
+            ]
+
+        # -------------------------------------------------------------
+        # 2. Choose parents (best_half) using pop_with_losses
+        # -------------------------------------------------------------
+        k_parents = max(1, int(self.population_size * self.fitness_ratio))
+        best_half = [
+            w for (_, _, w) in heapq.nsmallest(k_parents, pop_with_losses)
+        ]
+
+        # Sneakers: occasionally let the worst performers reproduce
+        if random.random() < self.sneaker_prob:
+            k_sneakers = max(1, int(self.population_size * self.sneakers_ratio))
+            sneakers = [
+                w for (_, _, w) in heapq.nlargest(k_sneakers, pop_with_losses)
+            ]
+            best_half.extend(sneakers)
+
+        # -------------------------------------------------------------
+        # 3. Elitist survivors chosen **only** by CE
+        # -------------------------------------------------------------
+        k_survivors = max(1, int(self.population_size * self.survivors_ratio))
+        survivors = [
+            w for (_, _, w) in heapq.nsmallest(k_survivors, pop_ce_only)
+        ]
+
+        # -------------------------------------------------------------
+        # 4. Create offspring
+        # -------------------------------------------------------------
         new_population = []
-        for _ in range(self.population_size): 
-            if num_parents == 0:
-                # Pure random individual
-                child = torch.rand(self.model.w.size(0), device=self.device).detach()
+
+        for _ in range(self.population_size - len(survivors)):
+            if self.num_parents == 0:
+                child = torch.rand_like(self.model.w, device=self.device)
             else:
-                # Evolutionary crossover + mutation
-                parents = random.sample(best_half, num_parents)
+                parents = random.sample(best_half, self.num_parents)
                 child = torch.empty_like(parents[0])
 
-                # Crossover: randomly copy genes from parents
-                for i in range(len(child)):
-                    parent = random.choice(parents)
-                    child[i] = parent[i]
+                # Uniform crossover
+                mask = torch.randint(0, self.num_parents, (child.numel(),),
+                                     device=self.device)
+                for p_idx in range(self.num_parents):
+                    child[mask == p_idx] = parents[p_idx][mask == p_idx]
 
                 # Mutation
                 mutation_mask = torch.rand_like(child) < self.mutation_rate
-                mutation_values = torch.normal(mean=0.0, std=self.mutation_intensity, size=child.size(), device=self.device)
-                child = torch.where(mutation_mask, child + mutation_values, child)
+                if self.mutation_type == "lap":
+                    noise = torch.distributions.Laplace(
+                        loc=0.0, scale=self.mutation_intensity
+                    ).sample(child.size()).to(self.device)
+                else:  # Gaussian
+                    noise = torch.normal(
+                        mean=0.0,
+                        std=self.mutation_intensity,
+                        size=child.size(),
+                        device=self.device
+                    )
+                child = torch.where(mutation_mask, child + noise, child)
 
             new_population.append(child)
 
+        # Add survivors untouched
+        new_population.extend(survivors)
 
+        # -------------------------------------------------------------
+        # 5. Optional back-prop fine-tune each child
+        # -------------------------------------------------------------
+        for i, indiv in enumerate(new_population):
+            self.model.w = indiv.to(self.device)
 
-        for i in range(len(new_population)):
-            #Load child weights into the model
-            self.model.w = new_population[i].clone().detach().requires_grad_(True)
-            
-            # Perform one backpropagation update
-            self.model.backprop_step(X, y, lr=0.05)
-            
-            # Save updated child back into the population
-            new_population[i] = self.model.w.detach().requires_grad_(True)
+            if self.use_backprop:
+                self.model.w.requires_grad_()
+                self.model.backprop_step(X, y, lr=0.05)
+                new_population[i] = self.model.w.detach()  # store detached
+            else:
+                new_population[i] = self.model.w
 
         self.population = new_population
+
+        # -------------------------------------------------------------
+        # 6. Pick champion for self.model.w  (CE-only is typical)
+        # -------------------------------------------------------------
+        with torch.no_grad():
+            pop_ce_only = [
+                (self.model.loss(X, y, w, include_diversity=False).item(), i, w)
+                for i, w in enumerate(self.population)               # <- use current pop
+            ]
+            best = min(pop_ce_only, key=lambda t: (t[0], t[1]))[2]
         
-        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
-                        for i, w in enumerate(new_population)]
-        
-        # Select the best individual from the new population using the same tie-breaker.
-        best = min(pop_with_losses, key=lambda tup: (tup[0], tup[1]))[2]
-        self.model.w = best
+        self.model.w = best  
 
 
 
