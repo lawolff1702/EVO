@@ -164,24 +164,24 @@ class DeepNeuralNetwork:
             return torch.argmax(logits, dim = 1)
 
     def loss(self, X, y, w=None):
-            if w is None:
-                w = self.w
-            X = X.to(self.device)
-            y = y.to(self.device)
-            
-            logits = self.forward(X, w)
-            # Cross entropy --> no longer binary
-            loss_function = nn.CrossEntropyLoss()
-            loss = loss_function(logits, y)
-            
+        if w is None:
+            w = self.w
+        X = X.to(self.device)
+        y = y.to(self.device)
+        
+        logits = self.forward(X, w)
+        # Cross entropy --> no longer binary
+        loss_function = nn.CrossEntropyLoss()
+        loss = loss_function(logits, y)
+        if not self.use_diversity_loss:
+            return loss
+        
+        diversity_term = self.optimizer.compute_diversity() if self.optimizer else 0
 
-            if not self.use_diversity_loss:
-                return loss
-            else:
-                diversity_term = self.optimizer.compute_diversity() if self.optimizer else 0
-                self.curr_loss = loss.item()
-                self.curr_diversity = diversity_term.item() * self.diversity_coeff
-                return loss - (self.diversity_coeff * diversity_term)
+        self.curr_loss = loss.item()
+        self.curr_diversity = diversity_term.item() * self.diversity_coeff
+
+        return loss - (self.diversity_coeff * diversity_term)
     
     def backprop_step(self, X, y, lr):
         X = X.to(self.device)     # move inputs to GPU/MPS if your w lives there
@@ -231,11 +231,6 @@ class EvolutionOptimizer():
         self.sneakers_ratio = 0.1
         self.sneaker_prob = 0.05
         self.mutation_type = "lap"
-        # Temporary
-        self.use_backprop = False
-
-    def set_use_backprop(self, use_backprop):
-        self.use_backprop = use_backprop
 
     def set_mutation_type(self, mutation_type):
         self.mutation_type = mutation_type
@@ -377,7 +372,19 @@ class EvolutionOptimizer():
     def diversity_standard_deviation(self):
         all_w = torch.stack(self.population)
         return all_w.std(dim=0).mean()
+    
+    def ce_loss(self, X, y, w=None):
+        if w is None:
+            w = self.w
+        
+        logits = self.model.forward(X, w)
 
+        loss_function = nn.CrossEntropyLoss()
+        loss = loss_function(logits, y)
+
+        self.curr_loss = loss.item()
+
+        return loss
 
     def step(self, X, y, num_parents=2):
         # Ensure X and y are on the target device.
@@ -386,17 +393,18 @@ class EvolutionOptimizer():
 
         if len(self.population) == 0:
             # Initialize population with random weight vectors.
-            self.population = [torch.rand(self.model.w.size(0), device=self.device)
+            self.population = [torch.rand(self.model.w.size(0), device=self.device).detach().requires_grad_(True) 
                             for _ in range(self.population_size)] 
             
 
         # Build tuples containing (loss, unique_id, candidate) so that ties can be broken.
-        pop_with_losses = []
-        for i, w in enumerate(self.population):
-            loss = self.model.loss(X, y, w)
-            with torch.no_grad():
-                pop_with_losses.append((loss.item(), i, w))
-
+        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) for i, w in enumerate(self.population)]
+        
+        # Include conditional so only calculate with CE when necessary
+        if self.model.use_diversity_loss == True:
+            pop_with_CE = [(self.ce_loss(X, y, w), i, w) for i, w in enumerate(self.population)]
+        else:
+            pop_with_CE = pop_with_losses
         
         # Use heapq to extract the best population based on the fitness threshold.
         best_half = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.fitness_ratio), pop_with_losses)]
@@ -406,7 +414,7 @@ class EvolutionOptimizer():
             sneakers = [w for (_, _, w) in heapq.nlargest(int(self.population_size * self.sneakers_ratio), pop_with_losses)]
             best_half.extend(sneakers)
         
-        survivors = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.survivors_ratio), pop_with_losses)]
+        survivors = [w for (_, _, w) in heapq.nsmallest(int(self.population_size * self.survivors_ratio), pop_with_CE)]
 
 
         new_population = []
@@ -447,22 +455,19 @@ class EvolutionOptimizer():
         new_population.extend(survivors)
 
         for i in range(len(new_population)):
-            self.model.w = new_population[i].to(self.device)
-
-            if self.use_backprop:
-                self.model.w.requires_grad_()
-                self.model.backprop_step(X, y, lr=0.05)
-                # After update, store the new weights (detached)
-                new_population[i] = self.model.w.detach()
-            else:
-                # If not using backprop, just store as-is
-                new_population[i] = self.model.w
+            #Load child weights into the model
+            self.model.w = new_population[i].clone().detach().requires_grad_(True)
+            
+            # Perform one backpropagation update
+            self.model.backprop_step(X, y, lr=0.05)
+            
+            # Save updated child back into the population
+            new_population[i] = self.model.w.detach().requires_grad_(True)
 
         self.population = new_population
         
-        with torch.no_grad():
-            pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) for i, w in enumerate(new_population)]
-
+        pop_with_losses = [(self.model.loss(X, y, w).item(), i, w) 
+                        for i, w in enumerate(new_population)]
         
         # Select the best individual from the new population using the same tie-breaker.
         best = min(pop_with_losses, key=lambda tup: (tup[0], tup[1]))[2]
