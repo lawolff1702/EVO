@@ -113,12 +113,12 @@ class LogisticRegression(LinearModel):
 
 class DeepNeuralNetwork:
     def __init__(self, layer_dims):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.layer_dims = layer_dims
         self.diversity_coeff = 0.0
         self.optimizer = None
         self.curr_bce = None
         self.curr_diversity = None
-        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
         self.shapes = []
         total_params = 0
@@ -212,6 +212,7 @@ class EvolutionOptimizer():
     them over generations.
     """
     def __init__(self, model, device=None):
+        self.device = device if device is not None else torch.device("cpu")
         self.model = model
         self.population = []
         self.mutation_rate = 0.1
@@ -221,7 +222,6 @@ class EvolutionOptimizer():
         self.mutation_intensity = 0.1
         self.diversity_metric = "euclidean"
         # Device: default to MPS if not provided.
-        self.device = device if device is not None else torch.device("mps")
 
     def set_mutation_rate(self, mutation_rate):
         self.mutation_rate = mutation_rate
